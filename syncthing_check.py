@@ -30,10 +30,10 @@ def scan(directory,fullpath):
 # MAIN
 print()
 path = sys.argv[1]
-gprint("Syncthing check:\t"+path)
+gprint("Syncthing check v1.1:\t"+path)
 counter = 0
 scan(path,path)
-print(" | Conflitti trovati:\t"+str(counter))
+print(" | Found conflicts:\t"+str(counter))
 
 for el in conflict_list:
     rprint(el)
@@ -41,5 +41,5 @@ print()
 
 # Notifica OS
 if (counter > 0):
-    os.system("notify-send 'Syncthing-Check' 'Rilevati "+str(counter)+" conflitti nel Drive"+path+"'")
+    os.system("notify-send 'Syncthing-Check' 'Found "+str(counter)+" conflicts in "+path+"'")
 

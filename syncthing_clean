@@ -8,6 +8,10 @@ import sys
 import argparse
 import mimetypes
 
+# CUSTOM SOFTWARE
+diff_tool = "meld"
+file_manager = "nemo"
+
 # Funzioni di stampa colorata
 global badprint
 badprint = False #impostare su True per disabilitare la stampa colorata
@@ -63,59 +67,50 @@ def scan(directory,rootpath):
     for entry in os.scandir(directory):
         try:
             fullpath = os.path.join(rootpath, entry.name) # Percorso assoluto
-            
-            #if entry.is_dir():
-            #    print(" > "+fullpath+"/"+entry.name+"/")
-            #    scan(entry,fullpath+"/"+entry.name)
 
             if entry.is_dir():
                 #print(f" > {fullpath}/")
                 scan(entry.path, fullpath)
 
             elif entry.is_file() and "sync-conflict" in entry.name:
-                rprint("Conflitto individuato")
+                rprint("Found conflict")
                 counter += 1
 
                 # Trovare file originale
                 original_name = find_original(entry.name)
                 original_full = os.path.join(rootpath, original_name)
-                #original_list = (entry.name).split(".")
-                #if len(original_list) == 3: # nome con estensione (es file.sync-conflict.txt)
-                #    original_name = original_list[0]+"."+original_list[2] # nome del file originale (senza sync-conflict-...)
-                #elif len(original_list) == 2: # nome senza estensione (es file.sync-conflict)
-                #    original_name = original_list[0]
-                rprint("File originale:\t"+original_name)
-                rprint("File conflitto:\t"+entry.name)
-                input(" | Premi un tasto per continuare...")
+                rprint("Original file:\t"+original_name)
+                rprint("Conflicting file:\t"+entry.name)
+                input(" | Press enter to continue...")
 
                 if os.path.exists(original_full) and is_text_mime(original_full):
-                    run(f'meld "{original_full}" "{fullpath}"')
-                    result = run("dialog --title 'ELIMINA FILE?' --yesno '"+fullpath+"' 10 60")
+                    run(f'{diff_tool} "{original_full}" "{fullpath}"')
+                    result = run("dialog --title 'DELETE FILE?' --yesno '"+fullpath+"' 10 60")
                     if result == 0:# YES
                         os.remove(fullpath)
                         eliminati_list.append(fullpath)
                 else:
-                    run(f'nemo "{fullpath}"')
+                    run(f'{file_manager} "{fullpath}"')
         except Exception as e:
-            rprint("Errore: "+str(e))
+            rprint("Error: "+str(e))
 
 # MAIN
-gprint("Syncthing Cleaner v2.1")
+gprint("Syncthing Cleaner v2.2")
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--dir", required=True, help="percorso della scansione")
+parser.add_argument("--dir", required=True, help="scan directory")
 args = parser.parse_args()
 path = args.dir
 counter = 0
 
 if not os.path.isdir(path):
-    rprint("Percorso non valido")
+    rprint("invalid path")
     sys.exit(1)
 
 scan(path,path)
 print()
-gprint("Conflitti trovati: "+str(counter)+"\n")
+gprint("Conflicts found: "+str(counter)+"\n")
 
-print(" - Conflitti risolti")
+print(" - Fixed conflicts:")
 for el in eliminati_list:
     gprint(el)
