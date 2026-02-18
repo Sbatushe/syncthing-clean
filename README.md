@@ -12,6 +12,7 @@ Python cli tool to fix Syncthing conflicts
 - Meld (or any text diff tool. Just edit the source code)
 - Nemo (or any file manager. Just edit source again)
 - Dialog (to show messages)
+- notify-send
 - Syncthing
 - A terminal
 
