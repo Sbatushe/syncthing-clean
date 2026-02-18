@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+# Script che elimina ricorsivamente tutti i file conflittuali, va usato con cautela
+# Lo script usa Meld per controllare le differenze. Poi usa dialog per chiederti quale eliminare
+# Requisiti: dialog
+import os
+import subprocess
+import sys
+import argparse
+import mimetypes
+
+# Funzioni di stampa colorata
+global badprint
+badprint = False #impostare su True per disabilitare la stampa colorata
+def rprint(skk): print(" E "+skk) if badprint else print("\033[91m E\033[00m {}" .format(skk))
+def gprint(skk): print(" * "+skk) if badprint else print("\033[92m *\033[00m {}" .format(skk))
+def xprint(skk): print(" ! "+skk) if badprint else print("\033[92m !\033[00m {}" .format(skk))
+
+def cmd(com):
+    gprint(com)
+    return cmd_mute(com)
+
+def cmd_mute(com):
+    proc = subprocess.Popen(com, stdout=subprocess.PIPE, shell=True)
+    (out, err) = proc.communicate()
+    os.system(com)
+    out = str(out)[2:]
+    l = len(out) - 3
+    out = out[:l]
+    return out
+
+def run(cmd):
+    gprint(cmd)
+    proc = subprocess.run(cmd, shell=True)
+    return proc.returncode
+
+def is_text_mime(path):
+    mime, _ = mimetypes.guess_type(path)
+    if not mime:
+        return False
+    return mime.startswith("text") or mime in [
+        "application/json",
+        "application/xml",
+        "application/x-shellscript",
+        "application/x-python"
+    ]
+
+def find_original(conflict_name):
+    parts = conflict_name.split(".")
+    cleaned = [p for p in parts if p != "sync-conflict"]
+
+    if len(parts) >= 3:
+        return ".".join([cleaned[0], cleaned[-1]])
+    return cleaned[0]
+
+# Funzione ricorsiva di scansione delle directory e subdirectory
+global counter
+global eliminati_list   # Elementi eliminati
+eliminati_list = []
+
+def scan(directory,rootpath):
+    global eliminati_list, counter
+
+    for entry in os.scandir(directory):
+        try:
+            fullpath = os.path.join(rootpath, entry.name) # Percorso assoluto
+            
+            #if entry.is_dir():
+            #    print(" > "+fullpath+"/"+entry.name+"/")
+            #    scan(entry,fullpath+"/"+entry.name)
+
+            if entry.is_dir():
+                #print(f" > {fullpath}/")
+                scan(entry.path, fullpath)
+
+            elif entry.is_file() and "sync-conflict" in entry.name:
+                rprint("Conflitto individuato")
+                counter += 1
+
+                # Trovare file originale
+                original_name = find_original(entry.name)
+                original_full = os.path.join(rootpath, original_name)
+                #original_list = (entry.name).split(".")
+                #if len(original_list) == 3: # nome con estensione (es file.sync-conflict.txt)
+                #    original_name = original_list[0]+"."+original_list[2] # nome del file originale (senza sync-conflict-...)
+                #elif len(original_list) == 2: # nome senza estensione (es file.sync-conflict)
+                #    original_name = original_list[0]
+                rprint("File originale:\t"+original_name)
+                rprint("File conflitto:\t"+entry.name)
+                input(" | Premi un tasto per continuare...")
+
+                if os.path.exists(original_full) and is_text_mime(original_full):
+                    run(f'meld "{original_full}" "{fullpath}"')
+                    result = run("dialog --title 'ELIMINA FILE?' --yesno '"+fullpath+"' 10 60")
+                    if result == 0:# YES
+                        os.remove(fullpath)
+                        eliminati_list.append(fullpath)
+                else:
+                    run(f'nemo "{fullpath}"')
+        except Exception as e:
+            rprint("Errore: "+str(e))
+
+# MAIN
+gprint("Syncthing Cleaner v2.1")
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--dir", required=True, help="percorso della scansione")
+args = parser.parse_args()
+path = args.dir
+counter = 0
+
+if not os.path.isdir(path):
+    rprint("Percorso non valido")
+    sys.exit(1)
+
+scan(path,path)
+print()
+gprint("Conflitti trovati: "+str(counter)+"\n")
+
+print(" - Conflitti risolti")
+for el in eliminati_list:
+    gprint(el)
